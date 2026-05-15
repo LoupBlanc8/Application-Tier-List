@@ -1,8 +1,9 @@
 /* ============================================
-   TIER LIST — Application Logic
+   TIER LIST — Application Logic (v2)
+   Categories & People fully customizable
    ============================================ */
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
     'IQ', 'PHYSIQUE', 'BÉGAYEMENT', 'HARCÈLEMENT', 'SUSCEPTIBILITÉ',
     'HUMOUR', 'GENTILLESSE', 'GÉNÉROSITÉ', 'AIGREUR', 'EGO',
     'ODEUR', 'CONFIANCE', 'RÉPARTIE', 'EMPATHIE', 'JALOUSIE',
@@ -18,11 +19,12 @@ const DEFAULT_DATA = [
 ];
 
 // State
+let categories = [];
 let people = [];
 let currentView = 'table';
 let editingIndex = -1;
 
-// DOM Elements
+// DOM
 const tableBody = document.getElementById('tableBody');
 const tierTable = document.getElementById('tierTable');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -32,14 +34,19 @@ const modalTitle = document.getElementById('modalTitle');
 const modalRatings = document.getElementById('modalRatings');
 const personName = document.getElementById('personName');
 const contextMenu = document.getElementById('contextMenu');
+const catModalOverlay = document.getElementById('catModalOverlay');
+const catList = document.getElementById('catList');
+const newCatInput = document.getElementById('newCatInput');
 
 // ============================================
-// INITIALIZATION
+// INIT
 // ============================================
 function init() {
-    const stored = localStorage.getItem('tierlist_data');
-    people = stored ? JSON.parse(stored) : [...DEFAULT_DATA];
-    
+    const storedCats = localStorage.getItem('tierlist_categories');
+    const storedPeople = localStorage.getItem('tierlist_data');
+    categories = storedCats ? JSON.parse(storedCats) : [...DEFAULT_CATEGORIES];
+    people = storedPeople ? JSON.parse(storedPeople) : [...DEFAULT_DATA];
+
     buildTableHeader();
     renderAll();
     bindEvents();
@@ -47,15 +54,16 @@ function init() {
 
 function save() {
     localStorage.setItem('tierlist_data', JSON.stringify(people));
+    localStorage.setItem('tierlist_categories', JSON.stringify(categories));
 }
 
 // ============================================
 // CALCULATIONS
 // ============================================
 function getAvg(person) {
-    const vals = Object.values(person.ratings);
-    const sum = vals.reduce((a, b) => a + b, 0);
-    return (sum / vals.length).toFixed(1);
+    if (categories.length === 0) return '0.0';
+    const sum = categories.reduce((acc, cat) => acc + (person.ratings[cat] ?? 0), 0);
+    return (sum / categories.length).toFixed(1);
 }
 
 function getRateColor(val) {
@@ -90,13 +98,11 @@ function getDotColor(val) {
 function buildTableHeader() {
     const thead = tierTable.querySelector('thead tr');
     thead.innerHTML = '<th class="sticky-col name-col">NOM</th>';
-    
-    CATEGORIES.forEach(cat => {
+    categories.forEach(cat => {
         const th = document.createElement('th');
         th.textContent = cat;
         thead.appendChild(th);
     });
-    
     const avgTh = document.createElement('th');
     avgTh.textContent = 'MOY.';
     avgTh.className = 'avg-col';
@@ -105,42 +111,31 @@ function buildTableHeader() {
 
 function renderTable() {
     tableBody.innerHTML = '';
-    
     people.forEach((person, idx) => {
         const tr = document.createElement('tr');
         tr.dataset.index = idx;
-        
-        // Name cell
+
         const nameTd = document.createElement('td');
         nameTd.className = 'sticky-col';
         nameTd.textContent = person.name;
         tr.appendChild(nameTd);
-        
-        // Rating cells
-        CATEGORIES.forEach(cat => {
+
+        categories.forEach(cat => {
             const td = document.createElement('td');
             const val = person.ratings[cat] ?? 0;
             td.innerHTML = createRatingDots(val);
             tr.appendChild(td);
         });
-        
-        // Average cell
+
         const avg = getAvg(person);
         const avgTd = document.createElement('td');
         avgTd.className = 'avg-cell';
         avgTd.style.color = getAvgColor(avg);
         avgTd.textContent = avg;
         tr.appendChild(avgTd);
-        
-        // Context menu on right-click
-        tr.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e, idx);
-        });
-        
-        // Double-click to edit
+
+        tr.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, idx); });
         tr.addEventListener('dblclick', () => openModal(idx));
-        
         tableBody.appendChild(tr);
     });
 }
@@ -148,14 +143,11 @@ function renderTable() {
 function createRatingDots(val) {
     let html = '<div class="rating-display">';
     for (let i = 1; i <= 5; i++) {
-        if (i <= val) {
-            html += `<span class="rating-dot filled ${getDotColor(val)}"></span>`;
-        } else {
-            html += `<span class="rating-dot empty"></span>`;
-        }
+        html += i <= val
+            ? `<span class="rating-dot filled ${getDotColor(val)}"></span>`
+            : `<span class="rating-dot empty"></span>`;
     }
-    html += `<span class="rating-value ${getRateColor(val)}">${val}</span>`;
-    html += '</div>';
+    html += `<span class="rating-value ${getRateColor(val)}">${val}</span></div>`;
     return html;
 }
 
@@ -164,15 +156,14 @@ function createRatingDots(val) {
 // ============================================
 function renderCards() {
     cardsGrid.innerHTML = '';
-    
     people.forEach((person, idx) => {
         const avg = getAvg(person);
         const card = document.createElement('div');
         card.className = 'person-card';
         card.style.animationDelay = `${idx * 0.06}s`;
-        
+
         let statsHtml = '';
-        CATEGORIES.forEach(cat => {
+        categories.forEach(cat => {
             const val = person.ratings[cat] ?? 0;
             const pct = (val / 5) * 100;
             const color = getAvgColor(val);
@@ -180,14 +171,12 @@ function renderCards() {
                 <div class="card-stat">
                     <span class="card-stat-label">${cat}</span>
                     <div class="card-stat-bar">
-                        <div class="mini-bar">
-                            <div class="mini-bar-fill" style="width:${pct}%;background:${color}"></div>
-                        </div>
+                        <div class="mini-bar"><div class="mini-bar-fill" style="width:${pct}%;background:${color}"></div></div>
                         <span class="card-stat-value ${getRateColor(val)}">${val}</span>
                     </div>
                 </div>`;
         });
-        
+
         card.innerHTML = `
             <div class="card-header">
                 <span class="card-name">${person.name}</span>
@@ -201,7 +190,6 @@ function renderCards() {
                 <button class="card-action-btn" onclick="openModal(${idx})">Modifier</button>
                 <button class="card-action-btn danger" onclick="deletePerson(${idx})">Supprimer</button>
             </div>`;
-        
         cardsGrid.appendChild(card);
     });
 }
@@ -211,79 +199,63 @@ function renderCards() {
 // ============================================
 function renderRanking() {
     rankingContainer.innerHTML = '';
-    
     const sorted = people
         .map((p, i) => ({ ...p, originalIdx: i, avg: parseFloat(getAvg(p)) }))
         .sort((a, b) => b.avg - a.avg);
-    
-    const maxAvg = sorted.length > 0 ? sorted[0].avg : 5;
-    
+
     sorted.forEach((person, rank) => {
         const row = document.createElement('div');
         row.className = 'ranking-row';
         row.style.animationDelay = `${rank * 0.08}s`;
-        
-        let posClass = '';
-        if (rank === 0) posClass = 'gold';
-        else if (rank === 1) posClass = 'silver';
-        else if (rank === 2) posClass = 'bronze';
-        
+        let posClass = rank === 0 ? 'gold' : rank === 1 ? 'silver' : rank === 2 ? 'bronze' : '';
         const barPct = (person.avg / 5) * 100;
-        
+
         row.innerHTML = `
             <div class="ranking-position ${posClass}">#${rank + 1}</div>
-            <div class="ranking-info">
-                <div class="ranking-name">${person.name}</div>
-            </div>
+            <div class="ranking-info"><div class="ranking-name">${person.name}</div></div>
             <div class="ranking-bar-container">
-                <div class="ranking-bar">
-                    <div class="ranking-bar-fill" style="width:${barPct}%"></div>
-                </div>
+                <div class="ranking-bar"><div class="ranking-bar-fill" style="width:${barPct}%"></div></div>
             </div>
             <div class="ranking-score" style="color:${getAvgColor(person.avg.toFixed(1))}">${person.avg.toFixed(1)}</div>`;
-        
+
         row.addEventListener('dblclick', () => openModal(person.originalIdx));
-        row.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showContextMenu(e, person.originalIdx);
-        });
-        
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, person.originalIdx); });
         rankingContainer.appendChild(row);
     });
 }
 
 // ============================================
-// MODAL
+// PERSON MODAL (Add / Edit)
 // ============================================
 function openModal(index = -1) {
     editingIndex = index;
     hideContextMenu();
-    
     modalTitle.textContent = index === -1 ? 'Ajouter une personne' : 'Modifier — ' + people[index].name;
     personName.value = index === -1 ? '' : people[index].name;
-    
-    // Build rating inputs
+
     modalRatings.innerHTML = '';
-    CATEGORIES.forEach(cat => {
+    categories.forEach(cat => {
         const currentVal = index === -1 ? 0 : (people[index].ratings[cat] ?? 0);
         const group = document.createElement('div');
         group.className = 'rating-input-group';
-        
+        const safeId = cat.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+
         let starsHtml = '<div class="star-rating">';
         for (let i = 5; i >= 1; i--) {
-            const id = `star_${cat.replace(/[^a-zA-Z]/g, '')}_${i}`;
-            starsHtml += `<input type="radio" name="rate_${cat}" id="${id}" value="${i}" ${currentVal === i ? 'checked' : ''}>`;
+            const id = `star_${safeId}_${i}`;
+            starsHtml += `<input type="radio" name="rate_${safeId}" id="${id}" value="${i}" ${currentVal === i ? 'checked' : ''}>`;
             starsHtml += `<label for="${id}" title="${i}"></label>`;
         }
+        // Zero option
+        const zeroId = `star_${safeId}_0`;
+        starsHtml += `<input type="radio" name="rate_${safeId}" id="${zeroId}" value="0" ${currentVal === 0 ? 'checked' : ''} class="sr-only">`;
         starsHtml += '</div>';
-        
-        group.innerHTML = `
-            <span class="rating-input-label">${cat}</span>
-            ${starsHtml}`;
-        
+
+        group.innerHTML = `<span class="rating-input-label">${cat}</span>${starsHtml}`;
+        group.dataset.category = cat;
         modalRatings.appendChild(group);
     });
-    
+
     modalOverlay.classList.remove('hidden');
     personName.focus();
 }
@@ -300,22 +272,82 @@ function saveModal() {
         personName.focus();
         return;
     }
-    
+
     const ratings = {};
-    CATEGORIES.forEach(cat => {
-        const checked = document.querySelector(`input[name="rate_${cat}"]:checked`);
+    categories.forEach(cat => {
+        const safeId = cat.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '');
+        const checked = document.querySelector(`input[name="rate_${safeId}"]:checked`);
         ratings[cat] = checked ? parseInt(checked.value) : 0;
     });
-    
+
     if (editingIndex === -1) {
         people.push({ name, ratings });
     } else {
         people[editingIndex] = { name, ratings };
     }
-    
+
     save();
+    buildTableHeader();
     renderAll();
     closeModal();
+}
+
+// ============================================
+// CATEGORY MODAL
+// ============================================
+function openCatModal() {
+    renderCatList();
+    catModalOverlay.classList.remove('hidden');
+    newCatInput.value = '';
+    newCatInput.focus();
+}
+
+function closeCatModal() {
+    catModalOverlay.classList.add('hidden');
+}
+
+function renderCatList() {
+    catList.innerHTML = '';
+    categories.forEach((cat, idx) => {
+        const item = document.createElement('div');
+        item.className = 'cat-item';
+        item.innerHTML = `
+            <span class="cat-item-name">${cat}</span>
+            <button class="cat-item-delete" title="Supprimer" data-idx="${idx}">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>`;
+        item.querySelector('.cat-item-delete').addEventListener('click', () => removeCategory(idx));
+        catList.appendChild(item);
+    });
+}
+
+function addCategory() {
+    const name = newCatInput.value.trim().toUpperCase();
+    if (!name) return;
+    if (categories.includes(name)) {
+        newCatInput.style.borderColor = 'var(--rate-1)';
+        return;
+    }
+    categories.push(name);
+    // Add default 0 rating for all people
+    people.forEach(p => { p.ratings[name] = 0; });
+    save();
+    renderCatList();
+    newCatInput.value = '';
+    newCatInput.style.borderColor = '';
+    newCatInput.focus();
+    buildTableHeader();
+    renderAll();
+}
+
+function removeCategory(idx) {
+    const cat = categories[idx];
+    categories.splice(idx, 1);
+    people.forEach(p => { delete p.ratings[cat]; });
+    save();
+    renderCatList();
+    buildTableHeader();
+    renderAll();
 }
 
 // ============================================
@@ -326,7 +358,6 @@ let contextTarget = -1;
 function showContextMenu(e, idx) {
     contextTarget = idx;
     contextMenu.classList.remove('hidden');
-    
     const x = Math.min(e.clientX, window.innerWidth - 160);
     const y = Math.min(e.clientY, window.innerHeight - 100);
     contextMenu.style.left = x + 'px';
@@ -352,15 +383,10 @@ function deletePerson(idx) {
 // ============================================
 function switchView(view) {
     currentView = view;
-    
-    document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
-    });
-    
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
     document.getElementById('tableView').classList.toggle('hidden', view !== 'table');
     document.getElementById('cardsView').classList.toggle('hidden', view !== 'cards');
     document.getElementById('rankingView').classList.toggle('hidden', view !== 'ranking');
-    
     renderAll();
 }
 
@@ -374,12 +400,11 @@ function renderAll() {
 // EXPORT
 // ============================================
 function exportData() {
-    let csv = 'NOM,' + CATEGORIES.join(',') + ',MOYENNE\n';
+    let csv = 'NOM,' + categories.join(',') + ',MOYENNE\n';
     people.forEach(p => {
-        const vals = CATEGORIES.map(c => p.ratings[c] ?? 0);
+        const vals = categories.map(c => p.ratings[c] ?? 0);
         csv += `${p.name},${vals.join(',')},${getAvg(p)}\n`;
     });
-    
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -390,52 +415,40 @@ function exportData() {
 }
 
 // ============================================
-// EVENT BINDINGS
+// EVENTS
 // ============================================
 function bindEvents() {
-    // View buttons
-    document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchView(btn.dataset.view));
-    });
-    
-    // Add person
+    document.querySelectorAll('.view-btn').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
+
     document.getElementById('btnAddPerson').addEventListener('click', () => openModal(-1));
-    
-    // Export
+    document.getElementById('btnAddCategory').addEventListener('click', openCatModal);
     document.getElementById('btnExport').addEventListener('click', exportData);
-    
-    // Modal
+
+    // Person modal
     document.getElementById('modalClose').addEventListener('click', closeModal);
     document.getElementById('btnCancel').addEventListener('click', closeModal);
     document.getElementById('btnSave').addEventListener('click', saveModal);
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) closeModal();
-    });
-    
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+
+    // Category modal
+    document.getElementById('catModalClose').addEventListener('click', closeCatModal);
+    document.getElementById('btnCatDone').addEventListener('click', closeCatModal);
+    document.getElementById('btnAddCat').addEventListener('click', addCategory);
+    catModalOverlay.addEventListener('click', (e) => { if (e.target === catModalOverlay) closeCatModal(); });
+    newCatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCategory(); });
+    newCatInput.addEventListener('focus', () => { newCatInput.style.borderColor = ''; });
+
     // Context menu
-    document.getElementById('ctxEdit').addEventListener('click', () => {
-        openModal(contextTarget);
-    });
-    document.getElementById('ctxDelete').addEventListener('click', () => {
-        deletePerson(contextTarget);
-    });
+    document.getElementById('ctxEdit').addEventListener('click', () => openModal(contextTarget));
+    document.getElementById('ctxDelete').addEventListener('click', () => deletePerson(contextTarget));
     document.addEventListener('click', hideContextMenu);
-    
+
     // Keyboard
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            hideContextMenu();
-        }
-        if (e.key === 'Enter' && !modalOverlay.classList.contains('hidden')) {
-            saveModal();
-        }
+        if (e.key === 'Escape') { closeModal(); closeCatModal(); hideContextMenu(); }
     });
-    
-    // Reset input style on focus
-    personName.addEventListener('focus', () => {
-        personName.style.borderColor = '';
-    });
+
+    personName.addEventListener('focus', () => { personName.style.borderColor = ''; });
 }
 
 // Start
