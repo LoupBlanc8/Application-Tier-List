@@ -153,6 +153,35 @@ body::after {
     margin-top: 2px;
 }
 
+.list-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 2px 6px;
+    margin-left: -6px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.list-selector:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.list-selector:hover .tagline {
+    color: var(--text-primary);
+}
+
+.list-selector svg {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.list-selector:hover svg {
+    color: var(--text-primary);
+    transform: translateY(1px);
+}
+
 .header-right {
     display: flex;
     gap: var(--space-sm);
@@ -939,6 +968,11 @@ body::after {
     background: var(--bg-elevated);
     border-radius: var(--radius-sm);
     animation: fadeIn 0.2s var(--ease-out);
+}
+
+.cat-item.active {
+    border: 1px solid var(--accent);
+    background: rgba(247, 37, 133, 0.05);
 }
 
 .cat-item-name {

@@ -16,7 +16,10 @@
     <header class="app-header">
         <div class="header-left">
             <h1 class="logo">TIER<span class="logo-accent">LIST</span></h1>
-            <p class="tagline">Classement Ultime</p>
+            <div class="list-selector" id="btnManageLists" title="Changer de Tier List">
+                <span id="currentListNameLabel" class="tagline">Classement Ultime</span>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M3 4l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
         </div>
         <div class="header-right">
             <button class="btn-add-category" id="btnAddCategory" title="Gérer les catégories">
@@ -137,6 +140,27 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-save" id="btnCatDone">Terminé</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for managing Tier Lists -->
+    <div class="modal-overlay hidden" id="listModalOverlay">
+        <div class="modal cat-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Mes Tier Lists</h2>
+                <button class="modal-close" id="listModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="cat-add-row">
+                    <input type="text" id="newListInput" placeholder="Nouvelle Tier List..." autocomplete="off">
+                    <button class="btn-add-cat" id="btnAddList" title="Créer">
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 4v10M4 9h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+                <div class="cat-list" id="listsContainer">
+                    <!-- List items injected here -->
+                </div>
             </div>
         </div>
     </div>

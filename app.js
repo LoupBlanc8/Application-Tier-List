@@ -27,6 +27,8 @@ const DEFAULT_DATA = [
 ];
 
 // State
+let tierLists = {};
+let currentListId = 'default';
 let categories = [];
 let polarity = {};   // { categoryName: true/false }
 let people = [];
@@ -46,17 +48,52 @@ const contextMenu = document.getElementById('contextMenu');
 const catModalOverlay = document.getElementById('catModalOverlay');
 const catList = document.getElementById('catList');
 const newCatInput = document.getElementById('newCatInput');
+const btnManageLists = document.getElementById('btnManageLists');
+const currentListNameLabel = document.getElementById('currentListNameLabel');
+const listModalOverlay = document.getElementById('listModalOverlay');
+const listModalClose = document.getElementById('listModalClose');
+const newListInput = document.getElementById('newListInput');
+const btnAddList = document.getElementById('btnAddList');
+const listsContainer = document.getElementById('listsContainer');
 
 // ============================================
 // INIT
 // ============================================
 function init() {
-    const storedCats = localStorage.getItem('tierlist_categories');
-    const storedPol = localStorage.getItem('tierlist_polarity');
-    const storedPeople = localStorage.getItem('tierlist_data');
-    categories = storedCats ? JSON.parse(storedCats) : [...DEFAULT_CATEGORIES];
-    polarity = storedPol ? JSON.parse(storedPol) : { ...DEFAULT_POLARITY };
-    people = storedPeople ? JSON.parse(storedPeople) : [...DEFAULT_DATA];
+    const storedLists = localStorage.getItem('tierlists_v2');
+    const storedCurrent = localStorage.getItem('tierlists_current');
+
+    if (storedLists) {
+        tierLists = JSON.parse(storedLists);
+        currentListId = storedCurrent || Object.keys(tierLists)[0];
+    } else {
+        // Migration from v1/v2 or default
+        const storedCats = localStorage.getItem('tierlist_categories');
+        const storedPol = localStorage.getItem('tierlist_polarity');
+        const storedPeople = localStorage.getItem('tierlist_data');
+        
+        tierLists = {
+            'default': {
+                id: 'default',
+                name: 'Classement Ultime',
+                categories: storedCats ? JSON.parse(storedCats) : [...DEFAULT_CATEGORIES],
+                polarity: storedPol ? JSON.parse(storedPol) : { ...DEFAULT_POLARITY },
+                people: storedPeople ? JSON.parse(storedPeople) : [...DEFAULT_DATA]
+            }
+        };
+        currentListId = 'default';
+    }
+
+    loadCurrentList();
+    bindEvents();
+}
+
+function loadCurrentList() {
+    const list = tierLists[currentListId];
+    categories = list.categories || [];
+    polarity = list.polarity || {};
+    people = list.people || [];
+    currentListNameLabel.textContent = list.name;
 
     // Ensure all categories have a polarity entry
     categories.forEach(cat => {
@@ -65,13 +102,16 @@ function init() {
 
     buildTableHeader();
     renderAll();
-    bindEvents();
 }
 
 function save() {
-    localStorage.setItem('tierlist_data', JSON.stringify(people));
-    localStorage.setItem('tierlist_categories', JSON.stringify(categories));
-    localStorage.setItem('tierlist_polarity', JSON.stringify(polarity));
+    if (tierLists[currentListId]) {
+        tierLists[currentListId].categories = categories;
+        tierLists[currentListId].polarity = polarity;
+        tierLists[currentListId].people = people;
+    }
+    localStorage.setItem('tierlists_v2', JSON.stringify(tierLists));
+    localStorage.setItem('tierlists_current', currentListId);
 }
 
 // ============================================
@@ -430,6 +470,88 @@ function removeCategory(idx) {
 }
 
 // ============================================
+// LIST MODAL
+// ============================================
+function openListModal() {
+    renderLists();
+    listModalOverlay.classList.remove('hidden');
+    newListInput.value = '';
+    newListInput.focus();
+}
+
+function closeListModal() {
+    listModalOverlay.classList.add('hidden');
+}
+
+function renderLists() {
+    listsContainer.innerHTML = '';
+    Object.values(tierLists).forEach(list => {
+        const isActive = list.id === currentListId;
+        const item = document.createElement('div');
+        item.className = `cat-item ${isActive ? 'active' : ''}`;
+        item.style.cursor = 'pointer';
+        
+        const isOnlyList = Object.keys(tierLists).length === 1;
+        item.innerHTML = `
+            <span class="cat-item-name">${list.name}</span>
+            <div class="cat-item-controls">
+                <button class="cat-item-delete" title="Supprimer" ${isOnlyList ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </div>`;
+        
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.cat-item-delete')) return;
+            switchList(list.id);
+        });
+
+        item.querySelector('.cat-item-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!isOnlyList) removeList(list.id);
+        });
+
+        listsContainer.appendChild(item);
+    });
+}
+
+function switchList(id) {
+    currentListId = id;
+    loadCurrentList();
+    save();
+    closeListModal();
+}
+
+function addList() {
+    const name = newListInput.value.trim();
+    if (!name) return;
+    
+    const id = 'list_' + Date.now();
+    tierLists[id] = {
+        id: id,
+        name: name,
+        categories: [...DEFAULT_CATEGORIES],
+        polarity: { ...DEFAULT_POLARITY },
+        people: []
+    };
+    
+    save();
+    newListInput.value = '';
+    switchList(id);
+}
+
+function removeList(id) {
+    if (confirm(`Supprimer définitivement la Tier List "${tierLists[id].name}" ?`)) {
+        delete tierLists[id];
+        if (currentListId === id) {
+            currentListId = Object.keys(tierLists)[0];
+            loadCurrentList();
+        }
+        save();
+        renderLists();
+    }
+}
+
+// ============================================
 // CONTEXT MENU
 // ============================================
 let contextTarget = -1;
@@ -501,6 +623,12 @@ function bindEvents() {
     document.getElementById('btnAddPerson').addEventListener('click', () => openModal(-1));
     document.getElementById('btnAddCategory').addEventListener('click', openCatModal);
     document.getElementById('btnExport').addEventListener('click', exportData);
+    document.getElementById('btnManageLists').addEventListener('click', openListModal);
+
+    document.getElementById('listModalClose').addEventListener('click', closeListModal);
+    document.getElementById('btnAddList').addEventListener('click', addList);
+    listModalOverlay.addEventListener('click', (e) => { if (e.target === listModalOverlay) closeListModal(); });
+    newListInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addList(); });
 
     document.getElementById('modalClose').addEventListener('click', closeModal);
     document.getElementById('btnCancel').addEventListener('click', closeModal);
@@ -519,7 +647,7 @@ function bindEvents() {
     document.addEventListener('click', hideContextMenu);
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { closeModal(); closeCatModal(); hideContextMenu(); }
+        if (e.key === 'Escape') { closeModal(); closeCatModal(); closeListModal(); hideContextMenu(); }
     });
 
     personName.addEventListener('focus', () => { personName.style.borderColor = ''; });
