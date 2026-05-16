@@ -495,14 +495,22 @@ function renderLists() {
         item.innerHTML = `
             <span class="cat-item-name">${list.name}</span>
             <div class="cat-item-controls">
+                <button class="cat-item-code" title="Copier le code" data-id="${list.id}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M8 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V17M8 5C8 6.10457 8.89543 7 10 7H14C15.1046 7 16 6.10457 16 5M8 5C8 3.89543 8.89543 3 10 3H14C15.1046 3 16 3.89543 16 5M16 5H18C19.1046 5 20 5.89543 20 7V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
                 <button class="cat-item-delete" title="Supprimer" ${isOnlyList ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : ''}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
             </div>`;
         
         item.addEventListener('click', (e) => {
-            if (e.target.closest('.cat-item-delete')) return;
+            if (e.target.closest('.cat-item-delete') || e.target.closest('.cat-item-code')) return;
             switchList(list.id);
+        });
+
+        item.querySelector('.cat-item-code').addEventListener('click', (e) => {
+            e.stopPropagation();
+            exportCode(list.id);
         });
 
         item.querySelector('.cat-item-delete').addEventListener('click', (e) => {
@@ -548,6 +556,62 @@ function removeList(id) {
         }
         save();
         renderLists();
+    }
+}
+
+function exportCode(id) {
+    const list = tierLists[id];
+    const dataToExport = {
+        n: list.name,
+        c: list.categories,
+        p: list.polarity,
+        pe: list.people.map(p => ({ n: p.name, r: p.ratings }))
+    };
+    
+    const json = JSON.stringify(dataToExport);
+    const base64 = btoa(unescape(encodeURIComponent(json)));
+    const code = 'TL-' + base64;
+    
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Code copié dans le presse-papier !');
+    }).catch(err => {
+        prompt('Copiez ce code :', code);
+    });
+}
+
+function importCode() {
+    const codeStr = document.getElementById('importCodeInput').value.trim();
+    if (!codeStr) return;
+    
+    try {
+        let base64 = codeStr;
+        if (codeStr.startsWith('TL-')) {
+            base64 = codeStr.substring(3);
+        }
+        
+        const json = decodeURIComponent(escape(atob(base64)));
+        const data = JSON.parse(json);
+        
+        if (!data || !data.n || !data.c || !data.p || !data.pe) {
+            throw new Error('Format invalide');
+        }
+        
+        const id = 'list_' + Date.now();
+        tierLists[id] = {
+            id: id,
+            name: data.n,
+            categories: data.c,
+            polarity: data.p,
+            people: data.pe.map(p => ({ name: p.n, ratings: p.r }))
+        };
+        
+        save();
+        document.getElementById('importCodeInput').value = '';
+        switchList(id);
+        renderLists();
+    } catch (e) {
+        console.error(e);
+        alert('Code invalide ou corrompu.');
     }
 }
 
@@ -627,8 +691,10 @@ function bindEvents() {
 
     document.getElementById('listModalClose').addEventListener('click', closeListModal);
     document.getElementById('btnAddList').addEventListener('click', addList);
+    document.getElementById('btnImportCode').addEventListener('click', importCode);
     listModalOverlay.addEventListener('click', (e) => { if (e.target === listModalOverlay) closeListModal(); });
     newListInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addList(); });
+    document.getElementById('importCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') importCode(); });
 
     document.getElementById('modalClose').addEventListener('click', closeModal);
     document.getElementById('btnCancel').addEventListener('click', closeModal);

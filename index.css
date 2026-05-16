@@ -982,7 +982,7 @@ body::after {
     letter-spacing: 0.05em;
 }
 
-.cat-item-delete {
+.cat-item-delete, .cat-item-code {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -999,6 +999,11 @@ body::after {
 .cat-item-delete:hover {
     color: var(--rate-1);
     background: rgba(239, 35, 60, 0.1);
+}
+
+.cat-item-code:hover {
+    color: var(--accent);
+    background: rgba(247, 37, 133, 0.1);
 }
 
 .cat-item-controls {
